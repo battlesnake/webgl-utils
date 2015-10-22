@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/battlesnake/webgl-utils/issues"
   },
-  "homepage": "https://github.com/battlesnake/webgl-utils#readme"
+  "homepage": "https://github.com/battlesnake/webgl-utils#readme",
+  "dependencies": {
+    "q": "^1.4.1"
+  }
 }
