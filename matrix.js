@@ -15,6 +15,11 @@ function matrix(Quaternion) {
 		return new Matrix(3, 3, data);
 	};
 
+	Matrix.mat2 = function () {
+		var data = arguments.length ? [].slice.apply(arguments) : null;
+		return new Matrix(2, 2, data);
+	};
+
 	Matrix.vec4 = function () {
 		var data = arguments.length ? [].slice.apply(arguments) : null;
 		return new Matrix(1, 4, data);
@@ -23,6 +28,11 @@ function matrix(Quaternion) {
 	Matrix.vec3 = function () {
 		var data = arguments.length ? [].slice.apply(arguments) : null;
 		return new Matrix(1, 3, data);
+	};
+
+	Matrix.vec2 = function () {
+		var data = arguments.length ? [].slice.apply(arguments) : null;
+		return new Matrix(1, 2, data);
 	};
 
 	Matrix.vec3to4 = function (v, br) {
@@ -36,6 +46,20 @@ function matrix(Quaternion) {
 		var d = v.data;
 		return new Matrix(1, 4, [
 				d[0], d[1], d[2], br
+			]);
+	};
+
+	Matrix.vec2to3 = function (v, br) {
+		assertVector(v);
+		if (v.height !== 2) {
+			throw new Error('Vector is wrong size');
+		}
+		if (arguments.length === 1) {
+			br = 1;
+		}
+		var d = v.data;
+		return new Matrix(1, 3, [
+				d[0], d[1], br
 			]);
 	};
 
@@ -156,7 +180,7 @@ function matrix(Quaternion) {
 		} else if (dx instanceof Matrix && dx.isVector && dx.length === 2) {
 			return translation(dx.data);
 		}
-		return new Matrix(4, 4, [1, 0, dx, 0, 1, dy, 0, 0, 1]);
+		return new Matrix(3, 3, [1, 0, dx, 0, 1, dy, 0, 0, 1]);
 	};
 
 	Matrix.Scale2D = function scale(sx, sy) {
