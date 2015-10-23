@@ -274,18 +274,22 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 			return v;
 		}
 
-		function enableAll() {
+		function enableAll(except) {
 			varArray.forEach(function (v) {
 				if (v instanceof ShaderAttribute) {
-					v.enable();
+					if (!except || except.indexOf(v.name) === -1) {
+						v.enable();
+					}
 				}
 			});
 		}
 
-		function disableAll() {
+		function disableAll(except) {
 			varArray.forEach(function (v) {
 				if (v instanceof ShaderAttribute) {
-					v.disable();
+					if (!except || except.indexOf(v.name) === -1) {
+						v.disable();
+					}
 				}
 			});
 		}
