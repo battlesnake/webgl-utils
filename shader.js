@@ -197,7 +197,6 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 					if (typeof value !== 'number') {
 						throw new Error('Scalar expected');
 					}
-					console.log(name, value);
 					return setFunc.call(gl, location, value);
 				}
 				if (isMatrix) {
@@ -212,7 +211,6 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 						value = new Int8Array(value);
 					}
 				}
-				console.log(name, value);
 				return setFunc.call(gl, location, value);
 			};
 		}
