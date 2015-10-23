@@ -18,7 +18,6 @@ function vertexBuffer() {
 		this.bind = bind;
 		this.typeCode = gl.FLOAT;
 		this.draw = draw;
-		this.drawMany = drawMany;
 		this.dynamic = !!isDynamic;
 		this.assign = assign;
 
@@ -43,21 +42,14 @@ function vertexBuffer() {
 			gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
 		}
 
-		function draw(asType) {
+		function draw(asType, drawCount) {
 			if (arguments.length === 0) {
 				asType = type;
 			}
-			gl.drawArrays(asType, 0, count);
-		}
-
-		function drawMany(starts, counts, asType) {
-			if (arguments.length === 2) {
-				asType = type;
+			if (arguments.length <= 1) {
+				drawCount = count;
 			}
-			if (starts.length !== counts.length) {
-				throw new Error('Index list length mismatch');
-			}
-			gl.multiDrawArrays(asType, starts, counts, starts.length);
+			gl.drawArrays(asType, 0, drawCount);
 		}
 	}
 }
