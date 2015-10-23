@@ -63,6 +63,22 @@ function matrix(Quaternion) {
 			]);
 	};
 
+	Matrix.mat2to3 = function (m, br) {
+		assertMatrix(m);
+		if (m.width !== 2 || !m.isSquare) {
+			throw new Error('Matrix is wrong size');
+		}
+		if (arguments.length === 1) {
+			br = 1;
+		}
+		var d = m.data;
+		return new Matrix(3, 3, [
+				d[0], d[1], 0,
+				d[2], d[3], 0,
+				0, 0, 0, br
+			]);
+	};
+
 	Matrix.mat3to4 = function (m, br) {
 		assertMatrix(m);
 		if (m.width !== 3 || !m.isSquare) {
@@ -213,12 +229,13 @@ function matrix(Quaternion) {
 		neg: matrixNegate,
 		mul: matrixMul,
 		transpose: matrixTranspose,
+		diagonal: matrixDiagonal,
 		dot: vectorDot,
 		norm: vectorNorm,
 		norm2: vectorNorm2,
 		unit: vectorUnit,
 		scaleTo: vectorScaleTo,
-		cross: vectorCross,
+		cross: vectorCross
 	};
 
 	return Matrix;
@@ -236,17 +253,26 @@ function matrix(Quaternion) {
 		this.height = h;
 		this.isSquare = w === h;
 		this.isVector = w === 1;
-		var data = zeros(wh);
+		this.isM4 = w === 4 && h === 4;
+		this.isM3 = w === 3 && h === 3;
+		this.isM2 = w === 2 && h === 2;
+		this.isV4 = w === 1 && h === 4;
+		this.isV3 = w === 1 && h === 3;
+		this.isV2 = w === 1 && h === 2;
+		var data;
 		if (arguments.length === 2 || value === false || value === null) {
-			setZero.call(this);
+			setZero();
 		} else if (value === true) {
 			setIdentity.call(this);
 		} else if (value instanceof Array) {
-			value = [].concat.apply([], value);
+			if (value.length && value[0] instanceof Array) {
+				value = [].concat.apply([], value);
+			}
 			if (w === h && value.length === w) {
 				setDiagonal.call(this, value);
 			} else if (value.length === wh) {
-				pushArray.call(this, value);
+				//pushArray.call(this, value);
+				data = value;
 			} else {
 				console.info('data length:', value.length);
 				console.info('matrix size:', w + 'x' + h);
@@ -264,21 +290,25 @@ function matrix(Quaternion) {
 		return Object.freeze(this);
 
 		function setDiagonal(t) {
+			setZero();
 			for (var i = 0; i < w; i++) {
 				data[i * (w + 1)] = t[i];
 			}
 		}
 
 		function setIdentity() {
+			setZero();
 			for (var i = 0; i < w; i++) {
 				data[i * (w + 1)] = 1;
 			}
 		}
 
 		function setZero() {
+			data = zeros(wh);
 		}
 
 		function pushArray(arr) {
+			setZero();
 			for (var i = 0; i < arr.length; i++) {
 				var el = arr[i];
 				if (typeof el !== 'number' || !isFinite(el)) {
@@ -430,6 +460,19 @@ function matrix(Quaternion) {
 			return this.scale(rhs);
 		}
 		assertMatrix(rhs);
+		if (this.isM4) {
+			if (rhs.isM4) {
+				return mulM4M4(this.data, rhs.data);
+			} else if (rhs.isV4) {
+				return mulM4V4(this.data, rhs.data);
+			}
+		} else if (this.isM3) {
+			if (rhs.isM3) {
+				return mulM3M3(this.data, rhs.data);
+			} else if (rhs.isV3) {
+				return mulM3V3(this.data, rhs.data);
+			}
+		}
 		var lw = this.width, lh = this.height;
 		var rw = rhs.width, rh = rhs.height;
 		if (lw !== rh) {
@@ -461,6 +504,74 @@ function matrix(Quaternion) {
 			}
 		}
 		return new Matrix(this.height, this.width, ar);
+	}
+
+	function matrixDiagonal() {
+		var w = this.width, h = this.height;
+		var l = this.data;
+		var c = Math.min(w, h);
+		var ar = [];
+		for (var i = 0; i < c; i++) {
+			ar[i] = l[i * (w + 1)];
+		}
+		return new Matrix(1, c, ar);
+	}
+
+	function mulM4M4(a, b) {
+		return new Matrix(4, 4, [
+			a[0]*b[0] + a[1]*b[4] + a[2]*b[8] + a[3]*b[12],
+			a[0]*b[1] + a[1]*b[5] + a[2]*b[9] + a[3]*b[13],
+			a[0]*b[2] + a[1]*b[6] + a[2]*b[10] + a[3]*b[14],
+			a[0]*b[3] + a[1]*b[7] + a[2]*b[11] + a[3]*b[15],
+
+			a[4]*b[0] + a[5]*b[4] + a[6]*b[8] + a[7]*b[12],
+			a[4]*b[1] + a[5]*b[5] + a[6]*b[9] + a[7]*b[13],
+			a[4]*b[2] + a[5]*b[6] + a[6]*b[10] + a[7]*b[14],
+			a[4]*b[3] + a[5]*b[7] + a[6]*b[11] + a[7]*b[15],
+
+			a[8]*b[0] + a[9]*b[4] + a[10]*b[8] + a[11]*b[12],
+			a[8]*b[1] + a[9]*b[5] + a[10]*b[9] + a[11]*b[13],
+			a[8]*b[2] + a[9]*b[6] + a[10]*b[10] + a[11]*b[14],
+			a[8]*b[3] + a[9]*b[7] + a[10]*b[11] + a[11]*b[15],
+
+			a[12]*b[0] + a[13]*b[4] + a[14]*b[8] + a[15]*b[12],
+			a[12]*b[1] + a[13]*b[5] + a[14]*b[9] + a[15]*b[13],
+			a[12]*b[2] + a[13]*b[6] + a[14]*b[10] + a[15]*b[14],
+			a[12]*b[3] + a[13]*b[7] + a[14]*b[11] + a[15]*b[15],
+		]);
+	}
+
+	function mulM4V4(a, b) {
+		return new Matrix(1, 4, [
+			a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3],
+			a[4]*b[0] + a[5]*b[1] + a[6]*b[2] + a[7]*b[3],
+			a[8]*b[0] + a[9]*b[1] + a[10]*b[2] + a[11]*b[3],
+			a[12]*b[0] + a[13]*b[1] + a[14]*b[2] + a[15]*b[3],
+		]);
+	}
+
+	function mulM3M3(a, b) {
+		return new Matrix(3, 3, [
+			a[0]*b[0] + a[1]*b[3] + a[2]*b[6] + a[3]*b[9],
+			a[0]*b[1] + a[1]*b[4] + a[2]*b[7] + a[3]*b[10],
+			a[0]*b[2] + a[1]*b[5] + a[2]*b[8] + a[3]*b[11],
+
+			a[3]*b[0] + a[4]*b[3] + a[5]*b[6] + a[6]*b[9],
+			a[3]*b[1] + a[4]*b[4] + a[5]*b[7] + a[6]*b[10],
+			a[3]*b[2] + a[4]*b[5] + a[5]*b[8] + a[6]*b[11],
+
+			a[6]*b[0] + a[7]*b[3] + a[8]*b[6] + a[9]*b[9],
+			a[6]*b[1] + a[7]*b[4] + a[8]*b[7] + a[9]*b[10],
+			a[6]*b[2] + a[7]*b[5] + a[8]*b[8] + a[9]*b[11],
+		]);
+	}
+
+	function mulM3V3(a, b) {
+		return new Matrix(1, 3, [
+			a[0]*b[0] + a[1]*b[1] + a[2]*b[2],
+			a[3]*b[0] + a[4]*b[1] + a[5]*b[2],
+			a[6]*b[0] + a[7]*b[1] + a[8]*b[2],
+		]);
 	}
 
 }
