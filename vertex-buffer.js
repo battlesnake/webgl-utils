@@ -5,8 +5,10 @@ function vertexBuffer() {
 
 	return VertexBuffer;
 
-	function VertexBuffer(gl, data, width, type) {
-		var count = data.length / width;
+	function VertexBuffer(gl, data, width, type, isDynamic) {
+		var hasData = typeof data !== 'number';
+		var length = hasData ? data.length : data;
+		var count = length / width;
 		if (count !== Math.floor(count) || width === 0) {
 			throw new Error('Dataset is incomplete');
 		}
@@ -16,11 +18,26 @@ function vertexBuffer() {
 		this.bind = bind;
 		this.typeCode = gl.FLOAT;
 		this.draw = draw;
+		this.drawMany = drawMany;
+		this.dynamic = !!isDynamic;
+		this.assign = assign;
 
-		this.bind();
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+		if (hasData) {
+			assign(data);
+		}
 
 		return Object.freeze(this);
+
+		function assign(data) {
+			if (data instanceof Array) {
+				data = new Float32Array(data);
+			}
+			if (data.length > length) {
+				throw new Error('Vertex buffer over-run');
+			}
+			this.bind();
+			gl.bufferData(gl.ARRAY_BUFFER, data, isDynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+		}
 
 		function bind() {
 			gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -31,6 +48,16 @@ function vertexBuffer() {
 				asType = type;
 			}
 			gl.drawArrays(asType, 0, count);
+		}
+
+		function drawMany(starts, counts, asType) {
+			if (arguments.length === 2) {
+				asType = type;
+			}
+			if (starts.length !== counts.length) {
+				throw new Error('Index list length mismatch');
+			}
+			gl.multiDrawArrays(asType, starts, counts, starts.length);
 		}
 	}
 }
