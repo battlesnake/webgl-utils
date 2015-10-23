@@ -158,18 +158,19 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 
 		this.form = 'uniform';
 
-		var setterName, width;
+		var setterName, width, isFloat = true, isMatrix = false, isScalar = false;
 		switch (type) {
-			case "int": setterName = "uniform1iv"; width = 1; break;
+			case "bool":
+			case "int": setterName = "uniform1i"; width = 1; isFloat = false; isScalar = true; break;
 			case "float":
-			case "vec1": setterName = "uniform1fv"; width = 1; break;
+			case "vec1": setterName = "uniform1f"; width = 1; isScalar = true; break;
 			case "vec2": setterName = "uniform2fv"; width = 2; break;
 			case "vec3": setterName = "uniform3fv"; width = 3; break;
 			case "vec4": setterName = "uniform4fv"; width = 4; break;
-			case "mat1": setterName = "uniformMatrix1fv"; width = 1; break;
-			case "mat2": setterName = "uniformMatrix2fv"; width = 2; break;
-			case "mat3": setterName = "uniformMatrix3fv"; width = 3; break;
-			case "mat4": setterName = "uniformMatrix4fv"; width = 4; break;
+			case "mat1": setterName = "uniformMatrix1fv"; width = 1; isMatrix = true; break;
+			case "mat2": setterName = "uniformMatrix2fv"; width = 2; isMatrix = true; break;
+			case "mat3": setterName = "uniformMatrix3fv"; width = 3; isMatrix = true; break;
+			case "mat4": setterName = "uniformMatrix4fv"; width = 4; isMatrix = true; break;
 			default: setterName = "<error>"; break;
 		}
 		var setFunc = gl[setterName];
@@ -177,9 +178,9 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 			throw new Error('Unsupported GLSL data type: "' + type + '"');
 		}
 		var setter;
-		if (setterName.indexOf('Matrix') !== -1) {
+		if (isMatrix) {
 			setter = function (location, value) {
-				if (!(value instanceof Matrix)) {
+				if (!isMatrix) {
 					throw new Error('Matrix required');
 				}
 				if (value.width !== width || !value.isSquare) {
@@ -187,16 +188,32 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 					throw new Error('Matrix is the wrong size');
 				}
 				value = value.transpose().data;
-				return setFunc.call(gl, location, gl.FALSE, new Float32Array(value));
+				value = new Float32Array(value);
+				return setFunc.call(gl, location, gl.FALSE, value);
 			};
 		} else {
 			setter = function (location, value) {
-				if (value instanceof Matrix) {
+				if (isScalar) {
+					if (typeof value !== 'number') {
+						throw new Error('Scalar expected');
+					}
+					console.log(name, value);
+					return setFunc.call(gl, location, value);
+				}
+				if (isMatrix) {
 					value = value.data;
 				} else if (typeof value === 'number') {
 					value = [value];
 				}
-				return setFunc.call(gl, location, new Float32Array(value));
+				if (value instanceof Array) {
+					if (isFloat) {
+						value = new Float32Array(value);
+					} else {
+						value = new Int8Array(value);
+					}
+				}
+				console.log(name, value);
+				return setFunc.call(gl, location, value);
 			};
 		}
 
