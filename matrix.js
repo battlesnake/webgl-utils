@@ -150,6 +150,32 @@ function matrix(Quaternion) {
 		return new Matrix.Perspective(fovy, aspect, z0, z1);
 	};
 
+	Matrix.Translation2D = function translation(dx, dy) {
+		if (dx instanceof Array && arguments.length === 1 && dx.length === 2) {
+			return translation(dx[0], dx[1]);
+		} else if (dx instanceof Matrix && dx.isVector && dx.length === 2) {
+			return translation(dx.data);
+		}
+		return new Matrix(4, 4, [1, 0, dx, 0, 1, dy, 0, 0, 1]);
+	};
+
+	Matrix.Scale2D = function scale(sx, sy) {
+		if (sx instanceof Array && arguments.length === 1 && sx.length === 2) {
+			return scale(sx[0], sx[1]);
+		} else if (sx instanceof Matrix && sx.isVector && sx.length === 2) {
+			return scale(sx.data);
+		} else if (arguments.length === 1) {
+			return scale(sx, sx);
+		}
+		return new Matrix(3, 3, [sx, sy, 1]);
+	};
+
+	Matrix.Rotation2D = function rotation(angle) {
+		var cs = Math.cos(angle);
+		var sn = Math.sin(angle);
+		return new Matrix(3, 3, [cs, -sn, 0, sn, cs, 0, 0, 0, 1]);
+	};
+
 	Matrix.Identity = function (w) {
 		return new Matrix(w, w, true);
 	};
