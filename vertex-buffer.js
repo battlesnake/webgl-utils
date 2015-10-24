@@ -12,7 +12,8 @@ function vertexBuffer() {
 		if (count !== Math.floor(count) || width === 0) {
 			throw new Error('Dataset is incomplete');
 		}
-		this.buffer = gl.createBuffer();
+		var buffer = gl.createBuffer();
+		this.buffer = buffer;
 		this.width = width;
 		this.count = count;
 		this.bind = bind;
@@ -34,12 +35,12 @@ function vertexBuffer() {
 			if (data.length > length) {
 				throw new Error('Vertex buffer over-run');
 			}
-			this.bind();
+			bind();
 			gl.bufferData(gl.ARRAY_BUFFER, data, isDynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
 		}
 
 		function bind() {
-			gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 		}
 
 		function draw(asType, drawCount) {

@@ -3,6 +3,21 @@ module.exports = quaternion;
 /*@ngInject*/
 function quaternion() {
 
+	var freeze = (process.env.freeze||'').length > 0;
+
+	Quaternion.prototype = {
+		toString: quaternionToString,
+		valueOf: quaternionToString,
+		mul: quaternionMul,
+		scale: quaternionScale,
+		norm2: quaternionNorm2,
+		norm: quaternionNorm,
+		unit: quaternionUnit,
+		scaleTo: quaternionScaleTo,
+
+		isQuaternion: true
+	};
+
 	function Quaternion(axis, angle) {
 		var r, i, j, k;
 		if (arguments.length === 4) {
@@ -34,26 +49,17 @@ function quaternion() {
 			console.log(arguments, this);
 			throw new Error('Quaternion members must be finite numbers');
 		}
-		if (!(this instanceof Quaternion)) {
-			return new Quaternion(r, i, j, k);
+		var data = [r, i, j, k];
+		this.data = data;
+		if (freeze) {
+			Object.freeze(data);
+			Object.freeze(this);
 		}
-		this.data = Object.freeze([r, i, j, k]);
-		return Object.freeze(this);
+		return this;
 	}
 
-	Quaternion.prototype = {
-		toString: quaternionToString,
-		valueOf: quaternionToString,
-		mul: quaternionMul,
-		scale: quaternionScale,
-		norm2: quaternionNorm2,
-		norm: quaternionNorm,
-		unit: quaternionUnit,
-		scaleTo: quaternionScaleTo
-	};
-
 	function assertQuaternion(x) {
-		if (!(x instanceof Quaternion)) {
+		if (!x.isQuaternion) {
 			throw new Error('Quaternion expected');
 		}
 	}

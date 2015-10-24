@@ -5,34 +5,38 @@ function matrix(Quaternion) {
 
 	/* Not intended to be fast or efficient */
 
+	var freeze = (process.env.freeze||'').length > 0;
+
+	var __raw = {};
+
 	Matrix.mat4 = function () {
-		var data = arguments.length ? [].slice.apply(arguments) : null;
-		return new Matrix(4, 4, data);
+		var data = arguments.length ? [].slice.apply(arguments) : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+		return Matrix.Raw(4, 4, data);
 	};
 
 	Matrix.mat3 = function () {
-		var data = arguments.length ? [].slice.apply(arguments) : null;
-		return new Matrix(3, 3, data);
+		var data = arguments.length ? [].slice.apply(arguments) : [0,0,0,0,0,0,0,0,0];
+		return Matrix.Raw(3, 3, data);
 	};
 
 	Matrix.mat2 = function () {
-		var data = arguments.length ? [].slice.apply(arguments) : null;
-		return new Matrix(2, 2, data);
+		var data = arguments.length ? [].slice.apply(arguments) : [0,0,0,0];
+		return Matrix.Raw(2, 2, data);
 	};
 
 	Matrix.vec4 = function () {
-		var data = arguments.length ? [].slice.apply(arguments) : null;
-		return new Matrix(1, 4, data);
+		var data = arguments.length ? [].slice.apply(arguments) : [0,0,0,0];
+		return Matrix.Raw(1, 4, data);
 	};
 
 	Matrix.vec3 = function () {
-		var data = arguments.length ? [].slice.apply(arguments) : null;
-		return new Matrix(1, 3, data);
+		var data = arguments.length ? [].slice.apply(arguments) : [0,0,0];
+		return Matrix.Raw(1, 3, data);
 	};
 
 	Matrix.vec2 = function () {
-		var data = arguments.length ? [].slice.apply(arguments) : null;
-		return new Matrix(1, 2, data);
+		var data = arguments.length ? [].slice.apply(arguments) : [0,0];
+		return Matrix.Raw(1, 2, data);
 	};
 
 	Matrix.vec3to4 = function (v, br) {
@@ -44,7 +48,7 @@ function matrix(Quaternion) {
 			br = 1;
 		}
 		var d = v.data;
-		return new Matrix(1, 4, [
+		return Matrix.Raw(1, 4, [
 				d[0], d[1], d[2], br
 			]);
 	};
@@ -58,7 +62,7 @@ function matrix(Quaternion) {
 			br = 1;
 		}
 		var d = v.data;
-		return new Matrix(1, 3, [
+		return Matrix.Raw(1, 3, [
 				d[0], d[1], br
 			]);
 	};
@@ -72,7 +76,7 @@ function matrix(Quaternion) {
 			br = 1;
 		}
 		var d = m.data;
-		return new Matrix(3, 3, [
+		return Matrix.Raw(3, 3, [
 				d[0], d[1], 0,
 				d[2], d[3], 0,
 				0, 0, 0, br
@@ -88,7 +92,7 @@ function matrix(Quaternion) {
 			br = 1;
 		}
 		var d = m.data;
-		return new Matrix(4, 4, [
+		return Matrix.Raw(4, 4, [
 				d[0], d[1], d[2], 0,
 				d[3], d[4], d[5], 0,
 				d[6], d[7], d[8], 0,
@@ -110,33 +114,33 @@ function matrix(Quaternion) {
 	Matrix.Translation = function translation(dx, dy, dz) {
 		if (dx instanceof Array && arguments.length === 1 && dx.length === 3) {
 			return translation(dx[0], dx[1], dx[2]);
-		} else if (dx instanceof Matrix && dx.isVector && dx.length === 3) {
+		} else if (dx.isMatrix && dx.isVector && dx.length === 3) {
 			return translation(dx.data);
 		}
-		return new Matrix(4, 4, [1, 0, 0, dx, 0, 1, 0, dy, 0, 0, 1, dz, 0, 0, 0, 1]);
+		return Matrix.Raw(4, 4, [1, 0, 0, dx, 0, 1, 0, dy, 0, 0, 1, dz, 0, 0, 0, 1]);
 	};
 
 	Matrix.Scale = function scale(sx, sy, sz) {
 		if (sx instanceof Array && arguments.length === 1 && sx.length === 3) {
 			return scale(sx[0], sx[1], sx[2]);
-		} else if (sx instanceof Matrix && sx.isVector && sx.length === 3) {
+		} else if (sx.isMatrix && sx.isVector && sx.length === 3) {
 			return scale(sx.data);
 		} else if (arguments.length === 1) {
 			return scale(sx, sx, sx);
 		}
-		return new Matrix(4, 4, [sx, sy, sz, 1]);
+		return Matrix.Raw(4, 4, [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1]);
 	};
 
 	Matrix.Rotation = function rotation(quat) {
 		if (arguments.length === 2) {
 			quat = new Quaternion(arguments[0], arguments[1]);
-		} else if (arguments.length !== 1 || !(quat instanceof Quaternion)) {
+		} else if (arguments.length !== 1 || !quat.isQuaternion) {
 			console.info(arguments);
 			throw new Error('Invalid parameter(s)');
 		}
 		var data = quat.unit().data;
 		var r = data[0], i = data[1], j = data[2], k = data[3];
-		return new Matrix(4, 4,
+		return Matrix.Raw(4, 4,
 			[
 				r*r + i*i - j*j - k*k,
 				2*(i*j - r*k),
@@ -163,7 +167,7 @@ function matrix(Quaternion) {
 	Matrix.Orthographic = function (x0, x1, y0, y1, z0, z1) {
 		var dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
 		var cx = x1 + x0, cy = y1 + y0, cz = z1 + z0;
-		return new Matrix(4, 4,
+		return Matrix.Raw(4, 4,
 			[
 				2/dx, 0, 0, -cx/dx,
 				0, 2/dy, 0, -cy/dy,
@@ -177,52 +181,61 @@ function matrix(Quaternion) {
 		var w = aspect * h;
 		var dz = z1 - z0;
 		/* Orthographic projection, then divide by z-value */
-		var m = [].slice.apply(new Matrix.Orthographic(-w/2, +w/2, -h/2, +h/2, 0, 1).data);
+		var m = [].slice.apply(Matrix.Orthographic(-w/2, +w/2, -h/2, +h/2, 0, 1).data);
 		m[10] = (z0 + z1) / dz;
 		m[11] = -2 * z0 * z1 / dz;
 		m[14] = 1;
 		m[15] = 0;
-		return new Matrix(4, 4, m);
+		return Matrix.Raw(4, 4, m);
 	};
 
 	Matrix.Camera35mm = function (aspect, focal_length, z0, z1) {
 		var fovy = 2 * Math.atan2(24, 2 * focal_length);
-		return new Matrix.Perspective(fovy, aspect, z0, z1);
+		return Matrix.Perspective(fovy, aspect, z0, z1);
 	};
 
 	Matrix.Translation2D = function translation(dx, dy) {
 		if (dx instanceof Array && arguments.length === 1 && dx.length === 2) {
 			return translation(dx[0], dx[1]);
-		} else if (dx instanceof Matrix && dx.isVector && dx.length === 2) {
+		} else if (dx.isMatrix && dx.isVector && dx.length === 2) {
 			return translation(dx.data);
 		}
-		return new Matrix(3, 3, [1, 0, dx, 0, 1, dy, 0, 0, 1]);
+		return Matrix.Raw(3, 3, [1, 0, dx, 0, 1, dy, 0, 0, 1]);
 	};
 
 	Matrix.Scale2D = function scale(sx, sy) {
 		if (sx instanceof Array && arguments.length === 1 && sx.length === 2) {
 			return scale(sx[0], sx[1]);
-		} else if (sx instanceof Matrix && sx.isVector && sx.length === 2) {
+		} else if (sx.isMatrix && sx.isVector && sx.length === 2) {
 			return scale(sx.data);
 		} else if (arguments.length === 1) {
 			return scale(sx, sx);
 		}
-		return new Matrix(3, 3, [sx, sy, 1]);
+		return Matrix.Raw(3, 3, [sx, 0, 0, 0, sy, 0, 0, 0, 1]);
 	};
 
 	Matrix.Rotation2D = function rotation(angle) {
 		var cs = Math.cos(angle);
 		var sn = Math.sin(angle);
-		return new Matrix(3, 3, [cs, -sn, 0, sn, cs, 0, 0, 0, 1]);
+		return Matrix.Raw(3, 3, [cs, -sn, 0, sn, cs, 0, 0, 0, 1]);
 	};
 
 	Matrix.Identity = function (w) {
-		return new Matrix(w, w, true);
+		var ar = zeros(w * w);
+		for (var i = 0; i < w; i++) {
+			ar[i * (w + 1)] = 1;
+		}
+		return Matrix.Raw(w, w, ar);
+	};
+
+	Matrix.Raw = function (w, h, ar) {
+		return new Matrix(w, h, __raw, ar);
 	};
 
 	Matrix.prototype = {
 		toString: matrixToString,
 		valueOf: matrixToString,
+
 		add: matrixAdd,
 		sub: matrixSub,
 		scale: matrixScale,
@@ -230,100 +243,119 @@ function matrix(Quaternion) {
 		mul: matrixMul,
 		transpose: matrixTranspose,
 		diagonal: matrixDiagonal,
+
 		dot: vectorDot,
 		norm: vectorNorm,
 		norm2: vectorNorm2,
 		unit: vectorUnit,
 		scaleTo: vectorScaleTo,
-		cross: vectorCross
+		cross: vectorCross,
+
+		isMatrix: true,
+		width: 0,
+		height: 0,
+		isSquare: false,
+		isVector: false,
+		isM4: false,
+		isM3: false,
+		isM2: false,
+		isV4: false,
+		isV3: false,
+		isV2: false,
+		data: null,
+		length: 0
 	};
 
 	return Matrix;
 
-	function Matrix(w, h, value) {
-		if (arguments.length < 2) {
-			throw new Error('Arguments missing');
-		}
+	function Matrix(w, h, value, raw) {
+		var isRaw = value === __raw;
 		var wh = w * h;
-		if (wh === 0 || !isFinite(wh) || Math.floor(wh) !== wh) {
-			console.info(w, h);
-			throw new Error('Matrix dimensions must be positive integers');
+		if (!isRaw) {
+			sanityChecks(arguments.length);
 		}
+		var w1 = w === 1, w2 = w === 2, w3 = w === 3, w4 = w === 4;
+		var h1 = h === 1, h2 = h === 2, h3 = h === 3, h4 = h === 4;
+		var square = w === h;
+		var vector = w1;
 		this.width = w;
 		this.height = h;
-		this.isSquare = w === h;
-		this.isVector = w === 1;
-		this.isM4 = w === 4 && h === 4;
-		this.isM3 = w === 3 && h === 3;
-		this.isM2 = w === 2 && h === 2;
-		this.isV4 = w === 1 && h === 4;
-		this.isV3 = w === 1 && h === 3;
-		this.isV2 = w === 1 && h === 2;
+		this.isSquare = square;
+		this.isVector = vector;
+		this.isM4 = w4 && h4;
+		this.isM3 = w3 && h3;
+		this.isM2 = w2 && h2;
+		this.isV4 = w1 && h4;
+		this.isV3 = w1 && h3;
+		this.isV2 = w1 && h2;
 		var data;
-		if (arguments.length === 2 || value === false || value === null) {
-			setZero();
-		} else if (value === true) {
-			setIdentity.call(this);
-		} else if (value instanceof Array) {
-			if (value.length && value[0] instanceof Array) {
-				value = [].concat.apply([], value);
-			}
-			if (w === h && value.length === w) {
-				setDiagonal.call(this, value);
-			} else if (value.length === wh) {
-				//pushArray.call(this, value);
-				data = value;
-			} else {
-				console.info('data length:', value.length);
-				console.info('matrix size:', w + 'x' + h);
-				throw new Error('Invalid value (size mismatch?)');
-			}
+		if (isRaw) {
+			data = raw;
 		} else {
-			console.log(value);
-			throw new Error('Invalid matrix initializer');
+			coerceValue();
 		}
-		if (!(this instanceof Matrix)) {
-			return new Matrix(w, h, data);
-		}
-		this.data = Object.freeze(data);
+		this.data = data;
 		this.length = data.length;
-		return Object.freeze(this);
+		if (freeze) {
+			Object.freeze(data);
+			Object.freeze(this);
+		}
+		return this;
 
-		function setDiagonal(t) {
-			setZero();
-			for (var i = 0; i < w; i++) {
-				data[i * (w + 1)] = t[i];
+		function sanityChecks(nargs) {
+			if (nargs < 2) {
+				throw new Error('Arguments missing');
+			}
+			if (wh <= 0 || w <= 0 || !isFinite(wh) || Math.floor(wh) !== wh) {
+				console.info(w, h);
+				throw new Error('Matrix dimensions must be positive integers');
 			}
 		}
 
-		function setIdentity() {
-			setZero();
-			for (var i = 0; i < w; i++) {
-				data[i * (w + 1)] = 1;
-			}
-		}
-
-		function setZero() {
-			data = zeros(wh);
-		}
-
-		function pushArray(arr) {
-			setZero();
-			for (var i = 0; i < arr.length; i++) {
-				var el = arr[i];
-				if (typeof el !== 'number' || !isFinite(el)) {
-					console.info('data:', arr);
-					console.info('matrix size:', w + 'x' + h);
-					throw new Error('Matrix/vector elements must be numerical');
+		function coerceValue() {
+			var i = 0;
+			if (value === true) {
+				data = zeros(wh);
+				for (i = 0; i < w; i++) {
+					data[i * (w + 1)] = 1;
 				}
-				data[i] = el;
+			} else if (arguments.length === 2 || value === false || value === null) {
+				data = zeros(wh);
+			} else if (value instanceof Array) {
+				if (value.length && value[0] instanceof Array) {
+					value = [].concat.apply([], value);
+				}
+				var vlen = value.length;
+				if (square && vlen === w) {
+					data = zeros(wh);
+					for (i = 0; i < w; i++) {
+						data[i * (w + 1)] = value[i];
+					}
+				} else if (vlen === wh) {
+					data = zeros(wh);
+					for (i = 0; i < value.length; i++) {
+						var el = value[i];
+						if (typeof el !== 'number' || !isFinite(el)) {
+							console.info('data:', value);
+							console.info('matrix size:', w + 'x' + h);
+							throw new Error('Matrix/vector elements must be numerical');
+						}
+						data[i] = el;
+					}
+				} else {
+					console.info('data length:', vlen);
+					console.info('matrix size:', w + 'x' + h);
+					throw new Error('Invalid value (size mismatch?)');
+				}
+			} else {
+				console.log(value);
+				throw new Error('Invalid matrix initializer');
 			}
 		}
 	}
 
 	function zeros(n) {
-		var ar = [];
-		ar.length = n;
+		var ar = new Array(n);
 		for (var i = 0; i < n; i++) {
 			ar[i] = 0;
 		}
@@ -338,7 +370,7 @@ function matrix(Quaternion) {
 	}
 
 	function assertMatrix(a) {
-		if (!(a instanceof Matrix)) {
+		if (!a.isMatrix) {
 			throw new Error('Matrix required');
 		}
 	}
@@ -371,7 +403,7 @@ function matrix(Quaternion) {
 		for (var i = 0; i < len; i++) {
 			ar[i] = l[i] + r[i];
 		}
-		return new Matrix(this.width, this.height, ar);
+		return Matrix.Raw(this.width, this.height, ar);
 	}
 
 	function matrixSub(rhs) {
@@ -383,7 +415,7 @@ function matrix(Quaternion) {
 		for (var i = 0; i < len; i++) {
 			ar[i] = l[i] - r[i];
 		}
-		return new Matrix(this.width, this.height, ar);
+		return Matrix.Raw(this.width, this.height, ar);
 	}
 
 	function matrixScale(s) {
@@ -393,7 +425,7 @@ function matrix(Quaternion) {
 		for (var i = 0; i < len; i++) {
 			ar[i] = l[i] * s;
 		}
-		return new Matrix(this.width, this.height, ar);
+		return Matrix.Raw(this.width, this.height, ar);
 	}
 
 	function matrixNegate() {
@@ -434,16 +466,16 @@ function matrix(Quaternion) {
 			assertMatrix(def);
 			return def;
 		} else {
-			return new Matrix(this.width, this.height);
+			return Matrix.Raw(this.width, this.height);
 		}
 	}
 
 	function vectorCross(rhs) {
 		assertMatrix(rhs);
-		assertSameSize(this, rhs);
+//		assertSameSize(this, rhs);
 		assertVector(this);
-		if (this.height !== 3) {
-			console.info(this.height);
+		if (!this.isV3 || !rhs.isV3) {
+			console.info(this, rhs);
 			throw new Error('Cross product only defined on 3D vectors');
 		}
 		var l = this.data, r = rhs.data;
@@ -452,14 +484,13 @@ function matrix(Quaternion) {
 			l[0] * r[2] - l[2] - r[0],
 			l[0] * r[1] - l[1] - r[0]
 		];
-		return new Matrix(this.width, this.height, ar);
+		return Matrix.Raw(this.width, this.height, ar);
 	}
 
 	function matrixMul(rhs) {
 		if (typeof rhs === 'number') {
 			return this.scale(rhs);
 		}
-		assertMatrix(rhs);
 		if (this.isM4) {
 			if (rhs.isM4) {
 				return mulM4M4(this.data, rhs.data);
@@ -473,6 +504,7 @@ function matrix(Quaternion) {
 				return mulM3V3(this.data, rhs.data);
 			}
 		}
+		assertMatrix(rhs);
 		var lw = this.width, lh = this.height;
 		var rw = rhs.width, rh = rhs.height;
 		if (lw !== rh) {
@@ -491,7 +523,7 @@ function matrix(Quaternion) {
 				ar[xw * i + j] = sum;
 			}
 		}
-		return new Matrix(rw, lh, ar);
+		return Matrix.Raw(rw, lh, ar);
 	}
 
 	function matrixTranspose() {
@@ -503,7 +535,7 @@ function matrix(Quaternion) {
 				ar[i + j * h] = l[j + i * w];
 			}
 		}
-		return new Matrix(this.height, this.width, ar);
+		return Matrix.Raw(this.height, this.width, ar);
 	}
 
 	function matrixDiagonal() {
@@ -514,11 +546,13 @@ function matrix(Quaternion) {
 		for (var i = 0; i < c; i++) {
 			ar[i] = l[i * (w + 1)];
 		}
-		return new Matrix(1, c, ar);
+		return Matrix.Raw(1, c, ar);
 	}
 
+	/*** Slightly optimised multiplication routines ***/
+
 	function mulM4M4(a, b) {
-		return new Matrix(4, 4, [
+		return Matrix.Raw(4, 4, [
 			a[0]*b[0] + a[1]*b[4] + a[2]*b[8] + a[3]*b[12],
 			a[0]*b[1] + a[1]*b[5] + a[2]*b[9] + a[3]*b[13],
 			a[0]*b[2] + a[1]*b[6] + a[2]*b[10] + a[3]*b[14],
@@ -542,7 +576,7 @@ function matrix(Quaternion) {
 	}
 
 	function mulM4V4(a, b) {
-		return new Matrix(1, 4, [
+		return Matrix.Raw(1, 4, [
 			a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3],
 			a[4]*b[0] + a[5]*b[1] + a[6]*b[2] + a[7]*b[3],
 			a[8]*b[0] + a[9]*b[1] + a[10]*b[2] + a[11]*b[3],
@@ -551,7 +585,7 @@ function matrix(Quaternion) {
 	}
 
 	function mulM3M3(a, b) {
-		return new Matrix(3, 3, [
+		return Matrix.Raw(3, 3, [
 			a[0]*b[0] + a[1]*b[3] + a[2]*b[6] + a[3]*b[9],
 			a[0]*b[1] + a[1]*b[4] + a[2]*b[7] + a[3]*b[10],
 			a[0]*b[2] + a[1]*b[5] + a[2]*b[8] + a[3]*b[11],
@@ -567,7 +601,7 @@ function matrix(Quaternion) {
 	}
 
 	function mulM3V3(a, b) {
-		return new Matrix(1, 3, [
+		return Matrix.Raw(1, 3, [
 			a[0]*b[0] + a[1]*b[1] + a[2]*b[2],
 			a[3]*b[0] + a[4]*b[1] + a[5]*b[2],
 			a[6]*b[0] + a[7]*b[1] + a[8]*b[2],

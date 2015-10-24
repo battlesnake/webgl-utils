@@ -100,9 +100,9 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 
 		this.form = 'attribute';
 		this.updateLocation = updateLocation;
-		this.enable = enable;
-		this.disable = disable;
-		this.bind = bind;
+		this.enable = enable.bind(this);
+		this.disable = disable.bind(this);
+		this.bind = bind.bind(this);
 		this.set = set;
 		return Object.freeze(this);
 
@@ -180,7 +180,7 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 		var setter;
 		if (isMatrix) {
 			setter = function (location, value) {
-				if (!isMatrix) {
+				if (!value.isMatrix) {
 					throw new Error('Matrix required');
 				}
 				if (value.width !== width || !value.isSquare) {
@@ -199,7 +199,7 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 					}
 					return setFunc.call(gl, location, value);
 				}
-				if (isMatrix) {
+				if (value.isMatrix) {
 					value = value.data;
 				} else if (typeof value === 'number') {
 					value = [value];
@@ -216,8 +216,8 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 		}
 
 		this.updateLocation = updateLocation;
-		this.assign = setValue;
-		this.set = setValue;
+		this.assign = setValue.bind(this);
+		this.set = setValue.bind(this);
 		this.bind = bind;
 
 		return Object.freeze(this);
