@@ -236,6 +236,7 @@ function matrix(Quaternion) {
 		toString: matrixToString,
 		valueOf: matrixToString,
 
+		/* Matrix/vector methods */
 		add: matrixAdd,
 		sub: matrixSub,
 		scale: matrixScale,
@@ -244,6 +245,7 @@ function matrix(Quaternion) {
 		transpose: matrixTranspose,
 		diagonal: matrixDiagonal,
 
+		/* Vector methods */
 		dot: vectorDot,
 		norm: vectorNorm,
 		norm2: vectorNorm2,
@@ -251,17 +253,19 @@ function matrix(Quaternion) {
 		scaleTo: vectorScaleTo,
 		cross: vectorCross,
 
+		/* Mutating methods (if !freeze) */
+		incBy: matrixIncBy,
+		decBy: matrixDecBy,
+		scaleBy: matrixScaleBy,
+		mulBy: matrixMulBy,
+		xformBy: vectorXformBy,
+
+		/* Properties */
 		isMatrix: true,
 		width: 0,
 		height: 0,
 		isSquare: false,
 		isVector: false,
-		isM4: false,
-		isM3: false,
-		isM2: false,
-		isV4: false,
-		isV3: false,
-		isV2: false,
 		data: null,
 		length: 0
 	};
@@ -274,20 +278,12 @@ function matrix(Quaternion) {
 		if (!isRaw) {
 			sanityChecks(arguments.length);
 		}
-		var w1 = w === 1, w2 = w === 2, w3 = w === 3, w4 = w === 4;
-		var h1 = h === 1, h2 = h === 2, h3 = h === 3, h4 = h === 4;
 		var square = w === h;
-		var vector = w1;
+		var vector = w === 1;
 		this.width = w;
 		this.height = h;
 		this.isSquare = square;
 		this.isVector = vector;
-		this.isM4 = w4 && h4;
-		this.isM3 = w3 && h3;
-		this.isM2 = w2 && h2;
-		this.isV4 = w1 && h4;
-		this.isV3 = w1 && h3;
-		this.isV2 = w1 && h2;
 		var data;
 		if (isRaw) {
 			data = raw;
@@ -376,7 +372,7 @@ function matrix(Quaternion) {
 	}
 
 	function assertVector(a) {
-		if (!a.isVector) {
+		if (a.width !== 1) {
 			console.info(a.width, a.height);
 			throw new Error('Vector required');
 		}
@@ -472,9 +468,9 @@ function matrix(Quaternion) {
 
 	function vectorCross(rhs) {
 		assertMatrix(rhs);
-//		assertSameSize(this, rhs);
 		assertVector(this);
-		if (!this.isV3 || !rhs.isV3) {
+		assertVector(rhs);
+		if (this.height !== 3 || rhs.height !== 3) {
 			console.info(this, rhs);
 			throw new Error('Cross product only defined on 3D vectors');
 		}
@@ -484,25 +480,40 @@ function matrix(Quaternion) {
 			l[0] * r[2] - l[2] - r[0],
 			l[0] * r[1] - l[1] - r[0]
 		];
-		return Matrix.Raw(this.width, this.height, ar);
+		return Matrix.Raw(1, 3, ar);
+	}
+
+	function matrixMulRaw(lh, rw, c, l, r) {
+		if (lh === 4 && c === 4) {
+			if (rw === 4) {
+				return mulM4M4(l, r);
+			} else if (rw === 1) {
+				return mulM4V4(l, r);
+			}
+		} else if (lh === 3 && c === 3) {
+			if (rw === 3) {
+				return mulM3M3(l, r);
+			} else if (rw === 1) {
+				return mulM3V3(l, r);
+			}
+		}
+		var xw = rw, xh = lh;
+		var ar = zeros(xw * xh);
+		for (var i = 0; i < lh; i++) {
+			for (var j = 0; j < rw; j++) {
+				var sum = 0;
+				for (var k = 0; k < c; k++) {
+					sum += l[c * i + k] * r[rw * k + j];
+				}
+				ar[xw * i + j] = sum;
+			}
+		}
+		return ar;
 	}
 
 	function matrixMul(rhs) {
 		if (typeof rhs === 'number') {
 			return this.scale(rhs);
-		}
-		if (this.isM4) {
-			if (rhs.isM4) {
-				return mulM4M4(this.data, rhs.data);
-			} else if (rhs.isV4) {
-				return mulM4V4(this.data, rhs.data);
-			}
-		} else if (this.isM3) {
-			if (rhs.isM3) {
-				return mulM3M3(this.data, rhs.data);
-			} else if (rhs.isV3) {
-				return mulM3V3(this.data, rhs.data);
-			}
 		}
 		assertMatrix(rhs);
 		var lw = this.width, lh = this.height;
@@ -511,18 +522,7 @@ function matrix(Quaternion) {
 			console.info(lw, lh, rw, rh);
 			throw new Error('Matrix multiplication failed, size mismatch');
 		}
-		var xw = rw, xh = lh;
-		var ar = zeros(xw * xh);
-		var l = this.data, r = rhs.data;
-		for (var i = 0; i < lh; i++) {
-			for (var j = 0; j < rw; j++) {
-				var sum = 0;
-				for (var k = 0; k < lw; k++) {
-					sum += l[lw * i + k] * r[rw * k + j];
-				}
-				ar[xw * i + j] = sum;
-			}
-		}
+		var ar = matrixMulRaw(lh, rw, lw, this.data, rhs.data);
 		return Matrix.Raw(rw, lh, ar);
 	}
 
@@ -552,7 +552,7 @@ function matrix(Quaternion) {
 	/*** Slightly optimised multiplication routines ***/
 
 	function mulM4M4(a, b) {
-		return Matrix.Raw(4, 4, [
+		return [
 			a[0]*b[0] + a[1]*b[4] + a[2]*b[8] + a[3]*b[12],
 			a[0]*b[1] + a[1]*b[5] + a[2]*b[9] + a[3]*b[13],
 			a[0]*b[2] + a[1]*b[6] + a[2]*b[10] + a[3]*b[14],
@@ -572,20 +572,20 @@ function matrix(Quaternion) {
 			a[12]*b[1] + a[13]*b[5] + a[14]*b[9] + a[15]*b[13],
 			a[12]*b[2] + a[13]*b[6] + a[14]*b[10] + a[15]*b[14],
 			a[12]*b[3] + a[13]*b[7] + a[14]*b[11] + a[15]*b[15],
-		]);
+		];
 	}
 
 	function mulM4V4(a, b) {
-		return Matrix.Raw(1, 4, [
+		return [
 			a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3],
 			a[4]*b[0] + a[5]*b[1] + a[6]*b[2] + a[7]*b[3],
 			a[8]*b[0] + a[9]*b[1] + a[10]*b[2] + a[11]*b[3],
 			a[12]*b[0] + a[13]*b[1] + a[14]*b[2] + a[15]*b[3],
-		]);
+		];
 	}
 
 	function mulM3M3(a, b) {
-		return Matrix.Raw(3, 3, [
+		return [
 			a[0]*b[0] + a[1]*b[3] + a[2]*b[6] + a[3]*b[9],
 			a[0]*b[1] + a[1]*b[4] + a[2]*b[7] + a[3]*b[10],
 			a[0]*b[2] + a[1]*b[5] + a[2]*b[8] + a[3]*b[11],
@@ -597,15 +597,86 @@ function matrix(Quaternion) {
 			a[6]*b[0] + a[7]*b[3] + a[8]*b[6] + a[9]*b[9],
 			a[6]*b[1] + a[7]*b[4] + a[8]*b[7] + a[9]*b[10],
 			a[6]*b[2] + a[7]*b[5] + a[8]*b[8] + a[9]*b[11],
-		]);
+		];
 	}
 
 	function mulM3V3(a, b) {
-		return Matrix.Raw(1, 3, [
+		return [
 			a[0]*b[0] + a[1]*b[1] + a[2]*b[2],
 			a[3]*b[0] + a[4]*b[1] + a[5]*b[2],
 			a[6]*b[0] + a[7]*b[1] + a[8]*b[2],
-		]);
+		];
+	}
+
+	function matrixIncBy(rhs) {
+		assertMatrix(rhs);
+		assertSameSize(this, rhs);
+		var l = this.data;
+		var r = rhs.data;
+		var c = l.length;
+		for (var i = 0; i < c; i++) {
+			l[i] += r[i];
+		}
+		return this;
+	}
+
+	function matrixDecBy(rhs) {
+		assertMatrix(rhs);
+		assertSameSize(this, rhs);
+		var l = this.data;
+		var r = rhs.data;
+		var c = l.length;
+		for (var i = 0; i < c; i++) {
+			l[i] -= r[i];
+		}
+		return this;
+	}
+
+	function matrixScaleBy(rhs) {
+		var l = this.data;
+		var c = l.length;
+		for (var i = 0; i < c; i++) {
+			l[i] *= rhs;
+		}
+		return this;
+	}
+
+	function matrixMulBy(rhs) {
+		if (typeof rhs === 'number') {
+			return matrixScaleBy(rhs);
+		} else {
+			var lw = this.width, lh = this.height;
+			var rw = rhs.width, rh = rhs.height;
+			if (lw !== rh) {
+				console.info(lw, lh, rw, rh);
+				throw new Error('Matrix multiplication failed, size mismatch');
+			}
+			if (lh !== rw) {
+				console.info(lw, lh, rw, rh);
+				throw new Error('Mutating matrix multiplication failed, matrices must be the same size');
+			}
+			this.data = matrixMulRaw(lw, lw, lw, this.data, rhs.data);
+			return this;
+		}
+	}
+
+	function vectorXformBy(lhs) {
+		if (typeof lhs === 'number') {
+			return matrixScaleBy(lhs);
+		} else {
+			var lw = lhs.width, lh = lhs.height;
+			var rw = this.width, rh = this.height;
+			if (lw !== rh) {
+				console.info(lw, lh, rw, rh);
+				throw new Error('Matrix multiplication failed, size mismatch');
+			}
+			if (rw !== 1) {
+				console.info(lw, lh, rw, rh);
+				throw new Error('Mutating vector transformation, object is a matrix not a vector');
+			}
+			this.data = matrixMulRaw(lw, lw, lw, lhs.data, this.data);
+			return this;
+		}
 	}
 
 }
