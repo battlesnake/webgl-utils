@@ -14,7 +14,18 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 		return Object.freeze(this);
 
 		function load(type, typeCode) {
-			return function (basename) {
+			loader.inject = injector;
+			return loader;
+			function injector(basename, glsl) {
+				var name = basename + '.' + type;
+				var test = cache.get(name);
+				if (test) {
+					//throw?
+				}
+				return $q.resolve({ name: name, glsl: glsl })
+					.then(compileShader);
+			}
+			function loader(basename) {
 				var name = basename + '.' + type;
 				var test = cache.get(name);
 				if (test) {
@@ -23,20 +34,26 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 				var path = 'shader/' + name;
 				return $http.get(path)
 					.then(function (res) {
-						var glsl = res.data;
-						var shader = gl.createShader(typeCode);
-						gl.shaderSource(shader, glsl);
-						gl.compileShader(shader);
-						if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-							cache.put(name, { shader: shader, source: glsl });
-							return shader;
-						} else {
-							throw new Error('Failed to compile shader "' + name + '": ' + gl.getShaderInfoLog(shader));
-						}
-					}, function (err) {
+						return { name: name, glsl: res.data };
+					})
+					.catch(function (err) {
 						throw new Error('Failed to get shader ' + name);
-					});
-			};
+					})
+					.then(compileShader);
+			}
+			function compileShader(data) {
+				var name = data.name;
+				var glsl = data.glsl;
+				var shader = gl.createShader(typeCode);
+				gl.shaderSource(shader, glsl);
+				gl.compileShader(shader);
+				if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+					cache.put(name, { shader: shader, source: glsl });
+					return shader;
+				} else {
+					throw new Error('Failed to compile shader "' + name + '": ' + gl.getShaderInfoLog(shader));
+				}
+			}
 		}
 
 		function get(name) {
