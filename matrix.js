@@ -100,6 +100,19 @@ function matrix(Quaternion) {
 			]);
 	};
 
+	Matrix.mat4to3 = function (m) {
+		assertMatrix(m);
+		if (m.width !== 4 || !m.isSquare) {
+			throw new Error('Matrix is wrong size');
+		}
+		var d = m.data;
+		return Matrix.Raw(3, 3, [
+				d[0], d[1], d[2],
+				d[4], d[5], d[6],
+				d[8], d[9], d[10]
+			]);
+	};
+
 	Matrix.Chain = function mulChain(m) {
 		if (m instanceof Array) {
 			return mulChain.apply(Matrix, m);
@@ -244,6 +257,8 @@ function matrix(Quaternion) {
 		mul: matrixMul,
 		transpose: matrixTranspose,
 		diagonal: matrixDiagonal,
+		extractCol: matrixExtractCol,
+		extractRow: matrixExtractRow,
 
 		/* Vector methods */
 		dot: vectorDot,
@@ -254,6 +269,7 @@ function matrix(Quaternion) {
 		cross: vectorCross,
 
 		/* Mutating methods (if !freeze) */
+		piecewiseBy: matrixPiecewiseBy,
 		incBy: matrixIncBy,
 		decBy: matrixDecBy,
 		scaleBy: matrixScaleBy,
@@ -677,6 +693,45 @@ function matrix(Quaternion) {
 			this.data = matrixMulRaw(lw, 1, lw, lhs.data, this.data);
 			return this;
 		}
+	}
+
+	function matrixExtractCol(index, transpose) {
+		var w = this.width, h = this.height;
+		if (index < 0 || index >= w) {
+			throw new Error('Index out of range');
+		}
+		var l = this.data;
+		var ar = new Array(h);
+		for (var i = 0; i < h; i++) {
+			ar[i] = l[i * w + index];
+		}
+		return Matrix.Raw(transpose ? h : 1, transpose ? 1 : h, ar);
+	}
+
+	function matrixExtractRow(index, transpose) {
+		var w = this.width, h = this.height;
+		if (index < 0 || index >= h) {
+			throw new Error('Index out of range');
+		}
+		var l = this.data;
+		var ar = new Array(h);
+		for (var i = 0; i < w; i++) {
+			ar[i] = l[index * w + i];
+		}
+		return Matrix.Raw(transpose ? 1 : w, transpose ? w : 1, ar);
+	}
+
+	function matrixPiecewiseBy(func) {
+		var w = this.width, h = this.height;
+		var l = this.data;
+		var idx = 0;
+		for (var i = 0; i < h; i++) {
+			for (var j = 0; j < w; j++) {
+				l[idx] = func(l[idx], j, i, idx);
+				idx++;
+			}
+		}
+		return this;
 	}
 
 }
