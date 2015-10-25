@@ -659,7 +659,7 @@ function matrix(Quaternion) {
 
 	function matrixMulBy(rhs) {
 		if (typeof rhs === 'number') {
-			return matrixScaleBy(rhs);
+			return this.scaleBy(rhs);
 		} else {
 			var lw = this.width, lh = this.height;
 			var rw = rhs.width, rh = rhs.height;
