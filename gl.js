@@ -1,4 +1,4 @@
-var webglDebug = require('./webglDebug');
+var webglDebug = require('./webgl-debug');
 var _ = require('lodash');
 
 module.exports = glModule;
