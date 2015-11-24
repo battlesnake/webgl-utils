@@ -3,6 +3,92 @@ var _ = require('lodash');
 
 module.exports = glModule;
 
+var defaultOptions = {
+	debug: false,
+	frontFace: 'ccw',
+	cullFace: 'back',
+	depthTest: '<=',
+	alphaBlend: ['s', '1-s'],
+	shaders: {}
+};
+
+function frontFaceValue(gl, s) {
+	s = s || 'ccw';
+	if (s === 'ccw') {
+		return gl.CCW;
+	} else if (s === 'cw') {
+		return gl.CW;
+	} else {
+		throw new Error('Invalid front-face value: ' + s);
+	}
+}
+
+function cullFaceValue(gl, s) {
+	s = s || 'none';
+	if (s === 'none') {
+		return null;
+	} else if (s === 'front') {
+		return gl.FRONT;
+	} else if (s === 'back') {
+		return gl.BACK;
+	} else if (s === 'both') {
+		return gl.FRONT_AND_BACK;
+	} else {
+		throw new Error('Invalid face-cull value: ' + s);
+	}
+}
+
+function depthTestValue(gl, s) {
+	s = s.toLowerCase() || '<=';
+	if (s === 'none') {
+		return null;
+	} else if (s === '<=') {
+		return gl.LEQUAL;
+	} else if (s === '>=') {
+		return gl.GEQUAL;
+	} else if (s === '>') {
+		return gl.GREATER;
+	} else if (s === '<') {
+		return gl.LESS;
+	} else if (s === '!=') {
+		return gl.NOTEQUAL;
+	} else if (s === '==') {
+		return gl.EQUAL;
+	} else if (s === 'true') {
+		return gl.ALWAYS;
+	} else if (s === 'false') {
+		return gl.NEVER;
+	} else {
+		throw new Error('Invalid depth-test value: ' + s);
+	}
+}
+
+function alphaBlendFuncTerm(gl, s) {
+	s = s.toLowerCase().replace(/\s/g, '') || '1';
+	if (s  === 'none') {
+		return null;
+	} if (s === '1' || s === 'one') {
+		return gl.ONE;
+	} else if (s === '0' || s === 'zero') {
+		return gl.ZERO;
+	} else if (s === 's' || s === 'src') {
+		return gl.SRC_ALPHA;
+	} else if (s === '1-s' || s === '1-src') {
+		return gl.ONE_MINUS_SRC_ALPHA;
+	} else if (s === 'd' || s === 'dst') {
+		return gl.DST_ALPHA;
+	} else if (s === '1-d' || s === '1-dst') {
+		return gl.ONE_MINUS_DST_ALPHA;
+	} else {
+		throw new Error('Invalid alpha-blend value: ' + s);
+	}
+}
+
+function alphaBlendFunc(gl, ss) {
+	ss = (!ss || ss === 'none') ? null : ['s', '1-s'];
+	return ss.map(function (s) { return alphaBlendFuncTerm(gl, s); });
+}
+
 /*@ngInject*/
 function glModule($q, ShaderRepository, Matrix, Quaternion) {
 
@@ -15,61 +101,83 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 		if (!canvas) {
 			return $q.reject(new Error('Canvas element not found'));
 		}
+		options = _.defaults({}, options, defaultOptions);
 		/* Context */
-		var context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-		if (options.debug && context) {
-			context = webglDebug.makeDebugContext(context, onGLError);
+		var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+		if (options.debug && gl) {
+			gl = webglDebug.makeDebugContext(gl, onGLError);
 		}
-		if (!context) {
-			return $q.reject(new Error('Failed to acquire WebGL context'));
+		if (!gl) {
+			return $q.reject(new Error('Failed to acquire WebGL gl'));
 		}
-		context.disable(context.CULL_FACE);
-		context.enable(context.DEPTH_TEST);
-		context.depthFunc(context.LEQUAL);
+		/* Configure gl */
+		var front = frontFaceValue(gl, options.frontFace);
+		gl.frontFace(front);
+		var cull = cullFaceValue(gl, options.cullFace);
+		if (cull) {
+			gl.enable(gl.CULL_FACE);
+			gl.cullFace(cull);
+		} else {
+			gl.disable(gl.CULL_FACE);
+		}
+		var depth = depthTestValue(gl, options.depthTest);
+		if (!depth) {
+			gl.disable(gl.DEPTH_TEST);
+		} else {
+			gl.enable(gl.DEPTH_TEST);
+			gl.depthFunc(depth);
+		}
+		var blend = alphaBlendFunc(gl, options.alphaBlend);
+		if (!blend) {
+			gl.disable(gl.BLEND);
+		} else {
+			gl.enable(gl.BLEND);
+			gl.blendEquation(gl.FUNC_ADD);
+			gl.blendFunc(blend[0], blend[1]);
+		}
 		/* Shaders */
-		var shaders = {};
-		var promise = $q.when(true);
-		if (options.shaders) {
-			promise = $q.all(
-				_(options.shaders)
-					.values()
-					.zip()
-					.map(function (lists) {
-						return lists.map(function (list) {
-							return _.uniq(list).reject(_.isUndefined);
-						});
-					})
-					.map(function (lists) {
-						return _.flatten([
-							lists[0].forEach(function (shader) {
-								return shaders.loadVertexShader(shader);
-							}),
-							lists[1].forEach(function (shader) {
-								return shaders.loadFragmentShader(shader);
-							})
-						]);
-					})
-					.value()
-				).then(function (res) {
-					_(options.shaders)
-						.pairs()
-						.map(function (pair) {
-							var name = pair[0];
-							var vertex = pair[1][0];
-							var fragment = pair[1][1];
-							return [name, shaders.build(vertex, fragment)];
-						})
-						.object()
-						.value();
+		var shaders = options.shaders || {};
+		var shadersLoaded =
+			$q.all(_(options.shaders)
+				.values()
+				.zip()
+				.map(function (lists) {
+					return lists.map(function (list) {
+						return _.uniq(list).reject(_.isUndefined);
+					});
 				})
-				;
-		}
+				.map(function (lists) {
+					return _.flatten([
+						lists[0].forEach(function (shader) {
+							return shaders.loadVertexShader(shader);
+						}),
+						lists[1].forEach(function (shader) {
+							return shaders.loadFragmentShader(shader);
+						})
+					]);
+				})
+				.value()
+			)
+			.then(function (res) {
+				_(options.shaders)
+					.pairs()
+					.map(function (pair) {
+						var name = pair[0];
+						var vertex = pair[1][0];
+						var fragment = pair[1][1];
+						return [name, shaders.build(vertex, fragment)];
+					})
+					.object()
+					.value();
+			})
+			;
 
+		/* Return */
 		var self = this;
-		return promise.then(function () {
+		return shadersLoaded.then(function () {
 			return _.extend(self, {
 				canvas: canvas,
-				context: context,
+				context: gl,
 				shaders: shaders,
 				/* Viewport */
 				viewport: [0, 0, 1, 1],
@@ -85,19 +193,21 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 					orientation: new Quaternion()
 				},
 				/* Apply to model matrix */
-				getCameraMatrix: getCameraMatrix
+				getCameraMatrix: getCameraMatrix,
 			});
 		});
 
 		function updateViewport(width, height) {
-			var w = width || canvas.offsetWidth;
-			var h = height || canvas.offsetHeight;
+			var w = width || canvas.clientWidth;
+			var h = height || canvas.clientHeight;
 			var a = w / h;
+			this.width = w;
+			this.height = h;
 			this.viewport = [0, 0, w, h];
 			this.aspect = a;
 			canvas.width = w;
 			canvas.height = h;
-			context.viewport(0, 0, w, h);
+			gl.viewport(0, 0, w, h);
 		}
 
 		function updateOrthographic(size, scaleMode, near, far) {
