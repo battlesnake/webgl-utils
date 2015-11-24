@@ -71,11 +71,12 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 				canvas: canvas,
 				context: context,
 				shaders: shaders,
+				/* Viewport */
 				viewport: [0, 0, 1, 1],
 				aspect: 1,
+				updateViewport: updateViewport,
 				/* Projection matrix */
 				projection: new Matrix.Orthographic(-1, 1, -1, 1, -1, 1),
-				updateProjection: updateProjection,
 				updateOrthographic: updateOrthographic,
 				updatePerspective: updatePerspective,
 				camera: {
@@ -88,7 +89,7 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 			});
 		});
 
-		function updateProjection(width, height) {
+		function updateViewport(width, height) {
 			var w = width || canvas.offsetWidth;
 			var h = height || canvas.offsetHeight;
 			var a = w / h;
