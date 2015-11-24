@@ -1,4 +1,10 @@
+var _ = require('lodash');
+
 module.exports = shader;
+
+var defaultOptions = {
+	shaderDir: 'shaders/'
+};
 
 /*@ngInject*/
 function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
@@ -6,7 +12,9 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 
 	return ShaderRepository;
 
-	function ShaderRepository(gl) {
+	function ShaderRepository(gl, options) {
+		options = _.defaults({}, options, defaultOptions);
+
 		var cache = $cacheFactory('glslCache-' + idx);
 		this.loadVertexShader = load('vertex', gl.VERTEX_SHADER);
 		this.loadFragmentShader = load('frag', gl.FRAGMENT_SHADER);
@@ -31,7 +39,7 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 				if (test) {
 					return $q.resolve(test);
 				}
-				var path = 'shader/' + name;
+				var path = (options.shaderDir + '/').replace(/\/\/$/, '/') + name;
 				return $http.get(path)
 					.then(function (res) {
 						return { name: name, glsl: res.data };
@@ -177,6 +185,7 @@ function shader($cacheFactory, $http, $q, Matrix, VertexBuffer) {
 
 		var setterName, width, isFloat = true, isMatrix = false, isScalar = false;
 		switch (type) {
+			case "sampler2D":
 			case "bool":
 			case "int": setterName = "uniform1i"; width = 1; isFloat = false; isScalar = true; break;
 			case "float":

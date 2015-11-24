@@ -39,7 +39,7 @@ function texture2d($q) {
 	return TextureRepository;
 
 	function TextureRepository(gl) {
-		var maxTextures = gl.getIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS);
+		var maxTextures = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
 		var slots = [];
 		var repository = [];
 		for (var i = 0; i < maxTextures; i++) {
@@ -69,9 +69,9 @@ function texture2d($q) {
 			slots[index] = false;
 		}
 
-		this.create = createTexture;
 		this.maxTextures = maxTextures;
-		this.unloadAll = unloadAll;
+		this.create = createTexture.bind(this);
+		this.unloadAll = unloadAll.bind(this);
 		return Object.freeze(this);
 
 		function createTexture() {
@@ -85,11 +85,11 @@ function texture2d($q) {
 
 		function Texture2D() {
 			var lastIndex = -1;
-			this.texture = null;
-			this.load = loadTexture;
-			this.unload = unloadTexture;
-			this.bind = bindTexture;
-			this.unbind = unbindTexture;
+			var texture = null;
+			this.load = loadTexture.bind(this);
+			this.unload = unloadTexture.bind(this);
+			this.bind = bindTexture.bind(this);
+			this.unbind = unbindTexture.bind(this);
 
 			return Object.freeze(this);
 
@@ -114,7 +114,7 @@ function texture2d($q) {
 				if (!this.texture) {
 					return;
 				}
-				gl.deleteTexture(this.texture);
+				gl.deleteTexture(texture);
 				this.texture = null;
 				repository.splice(repository.indexOf(this), 1);
 			}
@@ -122,10 +122,9 @@ function texture2d($q) {
 			function loadTextureFromImage(image, options) {
 				unloadTexture();
 				options = _.defaults({}, options, defaultOptions);
-				if (this.texture === null) {
-					this.texture = gl.createTexture();
+				if (texture === null) {
+					texture = gl.createTexture();
 				}
-				var texture = this.texture;
 				gl.bindTexture(gl.TEXTURE_2D, texture);
 				if (options.flipY) {
 					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -150,7 +149,7 @@ function texture2d($q) {
 			function bindTexture() {
 				var index = allocIndex(lastIndex);
 				gl.activeTexture(gl.TEXTURE0 + index);
-				gl.bindTexture(gl.TEXTURE_2D, this.texture);
+				gl.bindTexture(gl.TEXTURE_2D, texture);
 				lastIndex = index;
 				return index;
 			}
@@ -161,7 +160,7 @@ function texture2d($q) {
 					return;
 				}
 				gl.activeTexture(gl.TEXTURE0 + index);
-				gl.unbindTexture(gl.TEXTURE_2D, this.texture);
+				gl.bindTexture(gl.TEXTURE_2D, null);
 				deallocIndex(index);
 			}
 		}
