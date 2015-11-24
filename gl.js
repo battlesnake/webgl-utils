@@ -90,7 +90,7 @@ function alphaBlendFunc(gl, ss) {
 }
 
 /*@ngInject*/
-function glModule($q, ShaderRepository, Matrix, Quaternion) {
+function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 
 	function onGLError(err, func, args) {
 		console.error('WebGL call failed', err, func, args);
@@ -136,9 +136,11 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 			gl.blendFunc(blend[0], blend[1]);
 		}
 		/* Shaders */
+		var shaderRepo = new ShaderRepository(gl);
 		var shaders = options.shaders || {};
+		var programs;
 		var shadersLoaded =
-			$q.all(_(options.shaders)
+			$q.all(_(shaders)
 				.values()
 				.zip()
 				.map(function (lists) {
@@ -149,36 +151,62 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 				.map(function (lists) {
 					return _.flatten([
 						lists[0].forEach(function (shader) {
-							return shaders.loadVertexShader(shader);
+							return shaderRepo.loadVertexShader(shader);
 						}),
 						lists[1].forEach(function (shader) {
-							return shaders.loadFragmentShader(shader);
+							return shaderRepo.loadFragmentShader(shader);
 						})
 					]);
 				})
 				.value()
 			)
 			.then(function (res) {
-				_(options.shaders)
+				programs = _(options.shaders)
 					.pairs()
 					.map(function (pair) {
 						var name = pair[0];
 						var vertex = pair[1][0];
 						var fragment = pair[1][1];
-						return [name, shaders.build(vertex, fragment)];
+						return [name, shaderRepo.build(vertex, fragment)];
 					})
 					.object()
 					.value();
 			})
 			;
 
+		/* Textures */
+		var textureRepo = new TextureRepository(gl);
+		var textures = options.textures || {};
+		var texturesLoaded = [];
+		var texList = _(textures)
+			.pairs()
+			.map(function (pair) {
+				var name = pair[0];
+				var params = pair[1];
+				var url = typeof params === 'string' ? params : params[0];
+				var options = typeof params === 'string' ? null : params[1];
+				var tex = textureRepo.create();
+				var promise = tex.load(url, options);
+				texturesLoaded.push(promise);
+				return [name, tex];
+			})
+			.object()
+			.value()
+			;
+		texturesLoaded = $q.all(texturesLoaded);
+
 		/* Return */
 		var self = this;
-		return shadersLoaded.then(function () {
+		return $q.all(shadersLoaded, texturesLoaded).then(function () {
 			return _.extend(self, {
 				canvas: canvas,
 				context: gl,
-				shaders: shaders,
+				shaders: programs,
+				textures: texList,
+				repository: {
+					shader: shaderRepo,
+					texture: textureRepo
+				},
 				/* Viewport */
 				viewport: [0, 0, 1, 1],
 				aspect: 1,

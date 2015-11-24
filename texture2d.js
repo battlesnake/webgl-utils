@@ -109,7 +109,7 @@ function texture2d($q) {
 					throw new Error('Cannot load texture: unknown location type');
 				}
 			}
-			
+
 			function unloadTexture() {
 				if (!this.texture) {
 					return;
