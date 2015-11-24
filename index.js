@@ -4,6 +4,7 @@ var _quaternion = require('./quaternion')();
 var _matrix = require('./matrix')(_quaternion);
 var _vbo = require('./vertex-buffer')();
 var _shader = require('./shader')(cacheFactory, httpFactory(), q, _matrix, _vbo);
+var _texture  = require('./texture2d')(q);
 var _gl = require('./gl')(q, _shader, _matrix, _quaternion);
 
 module.exports = {
@@ -11,6 +12,7 @@ module.exports = {
 	Quaternion: _quaternion,
 	VBO: _vbo,
 	ShaderRepository: _shader,
+	TextureRepository: _texture,
 	GL: _gl
 };
 
