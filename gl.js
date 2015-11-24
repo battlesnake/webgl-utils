@@ -28,9 +28,9 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 		context.depthFunc(context.LEQUAL);
 		/* Shaders */
 		var shaders = {};
-		var promise;
+		var promise = $q.when(true);
 		if (options.shaders) {
-			$q.all(
+			promise = $q.all(
 				_(options.shaders)
 					.values()
 					.zip()
@@ -64,25 +64,29 @@ function glModule($q, ShaderRepository, Matrix, Quaternion) {
 				})
 				;
 		}
-		return {
-			canvas: canvas,
-			context: context,
-			shaders: shaders,
-			viewport: [0, 0, 1, 1],
-			aspect: 1,
-			/* Projection matrix */
-			projection: new Matrix.Orthographic(-1, 1, -1, 1, -1, 1),
-			updateProjection: updateProjection,
-			updateOrthographic: updateOrthographic,
-			updatePerspective: updatePerspective,
-			camera: {
-				position: Matrix.vec3(),
-				scale: 1,
-				orientation: new Quaternion()
-			},
-			/* Apply to model matrix */
-			getCameraMatrix: getCameraMatrix
-		};
+
+		var self = this;
+		return promise.then(function () {
+			return _.extend(self, {
+				canvas: canvas,
+				context: context,
+				shaders: shaders,
+				viewport: [0, 0, 1, 1],
+				aspect: 1,
+				/* Projection matrix */
+				projection: new Matrix.Orthographic(-1, 1, -1, 1, -1, 1),
+				updateProjection: updateProjection,
+				updateOrthographic: updateOrthographic,
+				updatePerspective: updatePerspective,
+				camera: {
+					position: Matrix.vec3(),
+					scale: 1,
+					orientation: new Quaternion()
+				},
+				/* Apply to model matrix */
+				getCameraMatrix: getCameraMatrix
+			});
+		});
 
 		function updateProjection(width, height) {
 			var w = width || canvas.offsetWidth;
