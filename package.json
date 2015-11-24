@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/battlesnake/webgl-utils#readme",
   "dependencies": {
+    "lodash": "^3.10.1",
     "q": "^1.4.1"
   }
 }

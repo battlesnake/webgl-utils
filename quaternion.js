@@ -14,6 +14,7 @@ function quaternion() {
 		norm: quaternionNorm,
 		unit: quaternionUnit,
 		scaleTo: quaternionScaleTo,
+		neg: quaternionNegate,
 
 		isQuaternion: true
 	};
@@ -113,6 +114,10 @@ function quaternion() {
 		} else {
 			return new Quaternion();
 		}
+	}
+
+	function quaternionNegate() {
+		return new Quaternion(this.data[0], -this.data[1], -this.data[2], -this.data[3]);
 	}
 
 	return Quaternion;
