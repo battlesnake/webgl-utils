@@ -102,6 +102,9 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			return $q.reject(new Error('Canvas element not found'));
 		}
 		options = _.defaults({}, options, defaultOptions);
+
+		var self = this;
+
 		/* Context */
 		var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 		if (options.debug && gl) {
@@ -110,6 +113,7 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 		if (!gl) {
 			return $q.reject(new Error('Failed to acquire WebGL gl'));
 		}
+
 		/* Configure gl */
 		var front = frontFaceValue(gl, options.frontFace);
 		gl.frontFace(front);
@@ -135,6 +139,7 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			gl.blendEquation(gl.FUNC_ADD);
 			gl.blendFunc(blend[0], blend[1]);
 		}
+
 		/* Shaders */
 		var shaderRepo = new ShaderRepository(gl);
 		var shaders = options.shaders || {};
@@ -195,10 +200,20 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			;
 		texturesLoaded = $q.all(texturesLoaded);
 
-		/* Return */
-		var self = this;
+		/* Cancels pending animation frame */
+		var cancelPendingFrame = function () {};
+		/* Frame time history */
+		var tHistory = [];
+		/* Time getter (seconds) */
+		var time = window.performance.now ?
+			function time_usecs() { return window.performance.now() / 1000; } :
+			function time_msecs() { return new Date().getTime() / 1000; };
+		/* Memento of viewport size */
+		var viewportPrev = '';
+
+		/* Result, resolved when all resources are loaded */
 		return $q.all(_.flatten([shadersLoaded, texturesLoaded])).then(function () {
-			return _.extend(self, {
+			_.extend(self, {
 				canvas: canvas,
 				context: gl,
 				shaders: programs,
@@ -207,7 +222,7 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 					shader: shaderRepo,
 					texture: textureRepo
 				},
-				/* Viewport */
+				/* Viewport (read-only) */
 				width: 1,
 				height: 1,
 				aspect: 1,
@@ -223,16 +238,124 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 				},
 				/* Apply to model matrix */
 				getCameraMatrix: getCameraMatrix,
+				/*** Rendering ***/
+				/* Callback when render is needed */
+				onrender: function (tPrev, tNow, dt) {},
+				/* When set, causes update() to trigger render, is reset on re-render */
+				renderNeeded: true,
+				/* When set, causes update() to trigger render, is not reset on re-render */
+				animating: false,
+				/* Invalidate+Update, synchronous re-render */
+				refresh: refresh,
+				/* Signals that we need to re-render (sets renderNeeded) */
+				invalidate: invalidate,
+				/* Triggers render if renderNeeded||animating */
+				update: update,
+				/*** Animation ***/
+				/* Animates using requestAnimationFrame unless dt param is specified */
+				startAnimating: startAnimating,
+				/* Stops ongoing animation */
+				stopAnimating: stopAnimating,
+				/*** Monitor viewport, refresh when viewport size changes ***/
+				monitoringViewport: false,
 			});
+			startViewportObserver();
+			return self;
 		});
+
+		function startViewportObserver() {
+			setInterval(recheckViewport, 1000/30);
+		}
+
+		function getViewportMemento() {
+			setViewport();
+			return self.width + ',' + self.height;
+		}
+
+		function recheckViewport() {
+			var memento = getViewportMemento();
+			if (memento !== viewportPrev) {
+				viewportPrev = memento;
+				refresh();
+			}
+		}
+
+		function refresh() {
+			self.invalidate();
+			self.update();
+		}
+
+		function invalidate() {
+			self.renderNeeded = true;
+		}
+
+		function update() {
+			if (self.renderNeeded || self.animating) {
+				renderFrame();
+			}
+		}
+
+		function renderFrame() {
+			var t = time();
+			var tHistLen = tHistory.length;
+			var tPrev = tHistLen ? tHistory[tHistLen - 1] : t;
+			tHistory.push(t);
+			while (tHistory.length > 30 || (tHistory.length > 3 && t - tHistory[0] > 1)) {
+				tHistory.pop();
+			}
+			var dt = t - tPrev;
+			self.renderNeeded = false;
+			try {
+				self.onrender(tPrev, t, dt);
+			} catch (e) {
+				self.stopAnimating();
+				throw e;
+			}
+		}
+
+		function startAnimating(dt) {
+			if (self.animating) {
+				self.stopAnimating();
+			}
+			self.animating = true;
+			dt = dt || 0;
+			if (dt || !window.requestAnimationFrame) {
+				var interval = window.setInterval(function () {
+					refresh();
+				}, dt * 1000);
+				cancelPendingFrame = function () {
+					window.clearInterval(interval);
+				};
+			} else {
+				var stopped = false;
+				var request = requestAnimationFrame(function onFrame() {
+					if (stopped) {
+						return;
+					}
+					refresh();
+					request = requestAnimationFrame(onFrame);
+				});
+				cancelPendingFrame = function () {
+					stopped = true;
+					if (window.cancelAnimationFrame) {
+						window.cancelAnimationFrame(request);
+					}
+				};
+			}
+		}
+
+		function stopAnimating() {
+			self.animating = false;
+			cancelPendingFrame();
+		}
 
 		function setViewport() {
 			var w = canvas.clientWidth;
 			var h = canvas.clientHeight;
 			var a = w / h;
-			this.width = w;
-			this.height = h;
-			this.aspect = a;
+			self.width = w;
+			self.height = h;
+			self.aspect = a;
 			canvas.width = w;
 			canvas.height = h;
 			gl.viewport(0, 0, w, h);
@@ -245,7 +368,7 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			far = (typeof far === 'number') ? far : +1;
 			var w = size;
 			var h = size;
-			var a = this.aspect;
+			var a = self.aspect;
 			if (scaleMode === 'fix-height') {
 				w *= a;
 			} else if (scaleMode === 'fix-width') {
@@ -269,20 +392,20 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			} else {
 				throw new Error('Unknown orthographic scale mode: ' + scaleMode);
 			}
-			this.projection = Matrix.Orthographic(-w, w, h, -h, near, far);
+			self.projection = Matrix.Orthographic(-w, w, h, -h, near, far);
 		}
 
 		function setPerspective(zoom_35mm, near, far) {
 			near = (typeof near === 'number') ? near : 1;
 			far = (typeof far === 'number') ? far : 1000;
-			this.projection = Matrix.Camera35mm(this.aspect, zoom_35mm, near, far);
+			self.projection = Matrix.Camera35mm(self.aspect, zoom_35mm, near, far);
 		}
 
 		function getCameraMatrix() {
 			return Matrix.Chain(
-				Matrix.Rotation(this.camera.orientation.neg()),
-				Matrix.Scale(1 / this.camera.scale),
-				Matrix.Translation(this.camera.position.neg())
+				Matrix.Rotation(self.camera.orientation.neg()),
+				Matrix.Scale(1 / self.camera.scale),
+				Matrix.Translation(self.camera.position.neg())
 			);
 		}
 	}
