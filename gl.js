@@ -392,12 +392,14 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			} else {
 				throw new Error('Unknown orthographic scale mode: ' + scaleMode);
 			}
-			self.projection = Matrix.Orthographic(-w, w, h, -h, near, far);
+			self.clip = { width: Math.abs(w), height: Math.abs(h), depth: Math.abs(far - near) };
+			self.projection = Matrix.Orthographic(-w/2, w/2, h/2, -h/2, near, far);
 		}
 
 		function setPerspective(zoom_35mm, near, far) {
 			near = (typeof near === 'number') ? near : 1;
 			far = (typeof far === 'number') ? far : 1000;
+			self.clip = { depth: Math.abs(far - near) } ;
 			self.projection = Matrix.Camera35mm(self.aspect, zoom_35mm, near, far);
 		}
 
