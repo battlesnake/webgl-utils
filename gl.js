@@ -363,17 +363,17 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 
 		function setOrthographic(size, scaleMode, near, far) {
 			size = (typeof size === 'number') ? size : 1;
-			scaleMode = scaleMode || 'fix-height';
+			scaleMode = scaleMode || 'fixed-height';
 			near = (typeof near === 'number') ? near : -1;
 			far = (typeof far === 'number') ? far : +1;
 			var w = size;
 			var h = size;
 			var a = self.aspect;
-			if (scaleMode === 'fix-height') {
+			if (scaleMode === 'fixed-height') {
 				w *= a;
-			} else if (scaleMode === 'fix-width') {
+			} else if (scaleMode === 'fixed-width') {
 				h /= a;
-			} else if (scaleMode === 'fix-area') {
+			} else if (scaleMode === 'fixed-area') {
 				h = size / Math.sqrt(a);
 				w = a * h;
 			} else if (scaleMode === 'fit' || scaleMode === 'contain') {
