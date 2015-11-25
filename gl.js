@@ -200,6 +200,8 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			;
 		texturesLoaded = $q.all(texturesLoaded);
 
+		/* Is a (possibly-asynchronous) render active? */
+		var rendering = false;
 		/* Cancels pending animation frame */
 		var cancelPendingFrame = function () {};
 		/* Frame time history */
@@ -296,6 +298,10 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 		}
 
 		function renderFrame() {
+			if (rendering) {
+				invalidate();
+				return;
+			}
 			var t = time();
 			var tHistLen = tHistory.length;
 			var tPrev = tHistLen ? tHistory[tHistLen - 1] : t;
@@ -306,8 +312,20 @@ function glModule($q, ShaderRepository, TextureRepository, Matrix, Quaternion) {
 			var dt = t - tPrev;
 			self.renderNeeded = false;
 			try {
-				self.onrender(tPrev, t, dt);
+				rendering = true;
+				var res = self.onrender(tPrev, t, dt);
+				if (res && res.then) {
+					res
+						.catch(failed)
+						.finally(() => { rendering = false; })
+						.done();
+				}
 			} catch (e) {
+				failed(e);
+			}
+
+			function failed(e) {
+				rendering = false;
 				self.stopAnimating();
 				throw e;
 			}
